@@ -1,0 +1,67 @@
+name: tajqisar_admin
+description: Admin panel for Taj Qaisar Restaurant.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  firebase_core: ^3.1.1
+  firebase_auth: ^5.1.1
+  cloud_firestore: ^5.0.2
+  remixicon: ^1.0.0
+  intl: ^0.19.0
+
+  cupertino_icons: ^1.0.6
+
+  image_picker: ^1.1.2
+  http: ^1.2.1
+
+  # هذه الإضافة لأجل الألوان في التصنيفات
+  flutter_colorpicker: ^1.1.0
+
+  # هذه الإضافة لجعل المحرر للصفحات المعلوماتية قابلا للتنسيق
+  markdown_editable_textinput: ^2.0.3
+
+  # لتحليل الإحصائيات
+  fl_chart: ^0.68.0
+
+  # لتحميل الإحصائيات بصيغة Excel
+  excel: ^4.0.2
+  universal_html: ^2.2.4
+
+  # لتطبيق تغيير الثيم وحفظه
+  provider: ^6.1.2
+  shared_preferences: ^2.2.3
+
+  # هذه الحزمة لتحميل الصور مرة واحدة
+  cached_network_image: ^3.3.1
+
+  # لحفظ ملف الإحصائيات في ملفات الهاتف
+  path_provider: ^2.1.3
+  permission_handler: ^11.3.1
+  open_file: ^3.3.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+
+  fonts:
+    - family: Tajawal
+      fonts:
+        - asset: assets/fonts/Tajawal-Regular.ttf
+        - asset: assets/fonts/Tajawal-Bold.ttf
+          weight: 700
