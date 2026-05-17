@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:remixicon/remixicon.dart';
 import '../widgets/theme_aware_image.dart';
 
@@ -15,58 +14,58 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   bool _isLoading = false;
 
   Future<void> _sendPasswordResetEmail() async {
-    if (_emailController.text.isEmpty) {
+    final email = _emailController.text.trim();
+    if (email.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('يرجى إدخال بريدك الإلكتروني.'),
           backgroundColor: Colors.red));
       return;
     }
-    setState(() {
-      _isLoading = true;
-    });
+
+    setState(() => _isLoading = true);
+
     try {
-      final email = _emailController.text.trim();
+      // Firebase Auth تتولى التحقق من وجود الحساب بشكل داخلي.
+      // لا نحتاج استعلام Firestore هنا — المستخدم غير مسجل ولن تُقبل قراءته.
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
 
-      // 1. البحث عن المستخدم في قاعدة البيانات
-      final userQuery = await FirebaseFirestore.instance
-          .collection('users')
-          .where('email', isEqualTo: email)
-          .limit(1)
-          .get();
-
-      if (userQuery.docs.isEmpty) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('لا يوجد حساب مسجل بهذا البريد الإلكتروني.'),
-            backgroundColor: Colors.red));
-      } else {
-        final userData = userQuery.docs.first.data();
-        // 2. التحقق مما إذا كان البريد موثقاً
-        if (userData['emailVerified'] == true) {
-          await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                content: Text(
-                    'تم إرسال رابط استعادة كلمة المرور إلى بريدك الإلكتروني.'),
-                backgroundColor: Colors.green));
-            Navigator.pop(context);
-          }
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-              content: Text(
-                  'هذا البريد الإلكتروني غير موثق. يرجى توثيقه أولاً عبر تسجيل الدخول.'),
-              backgroundColor: Colors.orange));
-        }
+            content: Text(
+                'إذا كان البريد مسجلاً لدينا، ستصلك رسالة استعادة كلمة المرور.'),
+            backgroundColor: Colors.green));
+        Navigator.pop(context);
+      }
+    } on FirebaseAuthException catch (e) {
+      String message = 'حدث خطأ، يرجى المحاولة مرة أخرى.';
+      if (e.code == 'user-not-found') {
+        // نعرض نفس الرسالة لأسباب أمنية (لا نكشف هل الإيميل مسجل أم لا)
+        message =
+            'إذا كان البريد مسجلاً لدينا، ستصلك رسالة استعادة كلمة المرور.';
+      } else if (e.code == 'invalid-email') {
+        message = 'صيغة البريد الإلكتروني غير صحيحة.';
+      } else if (e.code == 'too-many-requests') {
+        message = 'تم الإرسال مسبقاً، يرجى الانتظار قليلاً.';
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(message),
+            backgroundColor: e.code == 'user-not-found' ||
+                    e.code == 'too-many-requests'
+                ? Colors.green
+                : Colors.red));
+        if (e.code == 'user-not-found') Navigator.pop(context);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('حدث خطأ غير متوقع: $e'), backgroundColor: Colors.red));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('حدث خطأ: $e'), backgroundColor: Colors.red));
+      }
     }
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-    }
+
+    if (mounted) setState(() => _isLoading = false);
   }
+
 
   @override
   void dispose() {

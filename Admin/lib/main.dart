@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
+import 'core/app_config.dart';
 import 'providers/theme_provider.dart';
 import 'screens/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
-    // !!! هام: الصق نفس مفاتيح الربط التي استخدمتها في تطبيق الزبون !!!
+    // مفاتيح Firebase الخاصة بهذا المشروع
     options: const FirebaseOptions(
         apiKey: "AIzaSyDn7j9WaR66wDXTmy1SsjwxY4_AUssf7eA",
         authDomain: "tajalqaisar-605bf.firebaseapp.com",
@@ -44,7 +45,7 @@ class AdminApp extends StatelessWidget {
             Locale('ar', 'YE'),
           ],
           locale: const Locale('ar', 'YE'),
-          title: 'إدارة مطعم تاج القيصر',
+          title: 'إدارة ${AppConfig.restaurantFullName}',
           debugShowCheckedModeBanner: false,
 
           // ---===  تطبيق الثيمات هنا  ===---
@@ -57,15 +58,15 @@ class AdminApp extends StatelessWidget {
             scaffoldBackgroundColor: const Color(0xFFF9F9F9),
             cardColor: Colors.white,
             colorScheme: ColorScheme.fromSeed(
-              seedColor: const Color(0xFF6a2e0e),
-              primary: const Color(0xFF6a2e0e),
-              secondary: const Color(0xFFf39c12),
+              seedColor: AppConfig.primaryColor,
+              primary: AppConfig.primaryColor,
+              secondary: AppConfig.secondaryColor,
               surface: Colors.white,
               brightness: Brightness.light,
             ),
             elevatedButtonTheme: ElevatedButtonThemeData(
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF6a2e0e),
+                backgroundColor: AppConfig.primaryColor,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
@@ -74,7 +75,7 @@ class AdminApp extends StatelessWidget {
               ),
             ),
             floatingActionButtonTheme: FloatingActionButtonThemeData(
-              backgroundColor: const Color(0xFF6a2e0e),
+              backgroundColor: AppConfig.primaryColor,
               foregroundColor: Colors.white,
               elevation: 5,
               shape: RoundedRectangleBorder(
@@ -83,7 +84,7 @@ class AdminApp extends StatelessWidget {
             ),
             textButtonTheme: TextButtonThemeData(
               style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFF6a2e0e),
+                foregroundColor: AppConfig.primaryColor,
               ),
             ),
             appBarTheme: AppBarTheme(
@@ -114,10 +115,10 @@ class AdminApp extends StatelessWidget {
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide:
-                    BorderSide(color: const Color(0xFF6a2e0e), width: 2),
+                    BorderSide(color: AppConfig.primaryColor, width: 2),
                 gapPadding: 4,
               ),
-              prefixIconColor: const Color(0xFF6a2e0e).withOpacity(0.7),
+              prefixIconColor: AppConfig.primaryColor.withOpacity(0.7),
             ),
           ),
           darkTheme: ThemeData(
@@ -128,15 +129,15 @@ class AdminApp extends StatelessWidget {
             scaffoldBackgroundColor: const Color(0xFF121212),
             cardColor: const Color(0xFF1E1E1E),
             colorScheme: ColorScheme.fromSeed(
-              seedColor: const Color(0xFF8B4513),
-              primary: const Color(0xFF8B4513),
-              secondary: const Color(0xFFFFB74D),
+              seedColor: AppConfig.primaryColorDark,
+              primary: AppConfig.primaryColorDark,
+              secondary: AppConfig.secondaryColorDark,
               surface: const Color(0xFF1E1E1E),
               brightness: Brightness.dark,
             ),
             elevatedButtonTheme: ElevatedButtonThemeData(
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF8B4513),
+                backgroundColor: AppConfig.primaryColorDark,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
@@ -145,7 +146,7 @@ class AdminApp extends StatelessWidget {
               ),
             ),
             floatingActionButtonTheme: FloatingActionButtonThemeData(
-              backgroundColor: const Color(0xFF8B4513),
+              backgroundColor: AppConfig.primaryColorDark,
               foregroundColor: Colors.white,
               elevation: 5,
               shape: RoundedRectangleBorder(
@@ -154,7 +155,7 @@ class AdminApp extends StatelessWidget {
             ),
             textButtonTheme: TextButtonThemeData(
               style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFFFFB74D),
+                foregroundColor: AppConfig.secondaryColorDark,
               ),
             ),
             appBarTheme: AppBarTheme(
@@ -185,10 +186,10 @@ class AdminApp extends StatelessWidget {
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide:
-                    BorderSide(color: const Color(0xFFFFB74D), width: 2),
+                    BorderSide(color: AppConfig.secondaryColorDark, width: 2),
                 gapPadding: 4,
               ),
-              prefixIconColor: const Color(0xFFFFB74D).withOpacity(0.7),
+              prefixIconColor: AppConfig.secondaryColorDark.withOpacity(0.7),
             ),
           ),
           home: const SplashScreen(),

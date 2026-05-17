@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:remixicon/remixicon.dart';
+import '../core/app_config.dart';
 import '../providers/theme_provider.dart';
 import 'login_screen.dart';
 import 'edit_profile_screen.dart';
@@ -231,7 +232,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       textDirection: ui.TextDirection.ltr,
                       child: Text(
                         (_userData?['phone'] as String?)
-                                ?.replaceFirst('+967', '') ??
+                                ?.replaceFirst(AppConfig.countryCode, '') ??
                             'رقم غير محدد',
                         style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                       ),

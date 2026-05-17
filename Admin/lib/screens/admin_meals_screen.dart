@@ -1,8 +1,7 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:remixicon/remixicon.dart';
-import 'package:http/http.dart' as http;
+import '../services/imagekit_service.dart';
 import 'add_edit_meal_screen.dart';
 
 class AdminMealsScreen extends StatefulWidget {
@@ -17,26 +16,6 @@ class _AdminMealsScreenState extends State<AdminMealsScreen> {
   bool _showDiscountedOnly = false;
   String _searchQuery = '';
 
-  Future<void> _deleteImageFromImageKit(String fileId) async {
-    // !!! هام: لقد قمت بحذف المفاتيح من هنا. يرجى استبدالها بمفاتيحك الجديدة. !!!
-    const String privateKey = "YOUR_PRIVATE_KEY";
-    final url = Uri.parse('https://api.imagekit.io/v1/files/$fileId');
-
-    final String basicAuth =
-        'Basic ' + base64Encode(utf8.encode('$privateKey:'));
-
-    try {
-      final response =
-          await http.delete(url, headers: {'Authorization': basicAuth});
-      if (response.statusCode == 204) {
-        print('Successfully deleted old image from ImageKit.');
-      } else {
-        print('Failed to delete old image: ${response.body}');
-      }
-    } catch (e) {
-      print('Error deleting image: $e');
-    }
-  }
 
   void _showDeleteConfirmationDialog(
       BuildContext context, DocumentSnapshot mealDoc) {
@@ -59,7 +38,7 @@ class _AdminMealsScreenState extends State<AdminMealsScreen> {
               Navigator.of(ctx).pop();
 
               if (imageFileId != null) {
-                await _deleteImageFromImageKit(imageFileId);
+                await ImageKitService.deleteImage(imageFileId);
               }
 
               await mealDoc.reference.delete();

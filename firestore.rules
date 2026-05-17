@@ -1,0 +1,109 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ══════════════════════════════════════════════════════════
+    //  دوال مساعدة
+    // ══════════════════════════════════════════════════════════
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // isAdmin آمنة: تتحقق من collection منفصلة لا يستطيع المستخدم الكتابة فيها.
+    // لو استخدمنا users/{uid}.role ← المستخدم يقدر يحدّث ملفه ويجعل نفسه أدمن!
+    function isAdmin() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  قواعد collectionGroup — للأدمن فقط (ضرورية لشاشة الطلبات والإحصائيات)
+    // ══════════════════════════════════════════════════════════
+
+    // تسمح للأدمن بقراءة وتحديث أي طلب بغض النظر عن مكانه في قاعدة البيانات
+    match /{path=**}/orders/{orderId} {
+      allow read, update: if isAdmin();
+    }
+
+    // تسمح للأدمن بقراءة المفضلة لأغراض الإحصائيات
+    match /{path=**}/favorites/{favId} {
+      allow read: if isAdmin();
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  collection المديرين — محمية تماماً (يُعدَّل عبر Firebase Console فقط)
+    //  لإضافة مدير: أضف document باسم {uid} في هذه المجموعة
+    // ══════════════════════════════════════════════════════════
+
+    match /admins/{adminId} {
+      allow read, write: if false;
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  بيانات المستخدمين
+    // ══════════════════════════════════════════════════════════
+
+    match /users/{userId} {
+      // السماح بإنشاء الحساب فقط للمستخدمين المسجلين (بعد Firebase Auth)
+      allow create: if isAuthenticated();
+      // القراءة والتعديل: المستخدم نفسه أو الأدمن
+      allow read, update: if isOwner(userId) || isAdmin();
+      allow delete: if false;
+
+      // الطلبات: المستخدم يقرأ وينشئ فقط — التحديث للأدمن عبر collectionGroup
+      match /orders/{orderId} {
+        allow read, create: if isOwner(userId);
+        allow update, delete: if false;
+      }
+
+      // المفضلة: المستخدم يتحكم بها بالكامل
+      match /favorites/{favId} {
+        allow read, write, delete: if isOwner(userId);
+      }
+
+      // السلة: المستخدم يتحكم بها بالكامل
+      match /cart/{cartId} {
+        allow read, write, delete: if isOwner(userId);
+      }
+
+      // العناوين: المستخدم يتحكم بها بالكامل
+      match /addresses/{addressId} {
+        allow read, write, delete: if isOwner(userId);
+      }
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  المجموعات العامة — القراءة مفتوحة للجميع، الكتابة للأدمن فقط
+    // ══════════════════════════════════════════════════════════
+
+    match /meals/{mealId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /banners/{bannerId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /delivery_zones/{zoneId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /pages/{pageId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}

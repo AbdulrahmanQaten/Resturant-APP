@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:remixicon/remixicon.dart';
 import 'package:google_nav_bar/google_nav_bar.dart';
+import '../core/app_config.dart';
 import 'home_screen.dart';
 import 'favorites_screen.dart';
 import 'cart_screen.dart';
@@ -82,7 +83,7 @@ class _MainScreenState extends State<MainScreen> {
           ],
         ),
         content: Text(
-            'مرحباً بك يا $name في مطعم تاج القيصر! نتمنى لك تجربة ممتعة.'),
+            'مرحباً بك يا $name في ${AppConfig.restaurantFullName}! نتمنى لك تجربة ممتعة.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),

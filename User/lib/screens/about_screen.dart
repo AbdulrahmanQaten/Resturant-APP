@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:remixicon/remixicon.dart';
+import '../core/app_config.dart';
 import '../widgets/theme_aware_image.dart';
 
 class AboutScreen extends StatelessWidget {
@@ -23,7 +24,7 @@ class AboutScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                'تطبيق مطعم تاج القيصر',
+                'تطبيق ${AppConfig.restaurantFullName}',
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),

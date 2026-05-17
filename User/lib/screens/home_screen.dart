@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import '../services/cart_service.dart';
-import '../widgets/image_viewer.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/category_bar.dart';
 import '../widgets/promo_banner.dart';
 import '../widgets/search_bar.dart';
+import '../widgets/meal_card_grid.dart';
+import '../widgets/meal_card_list.dart';
 
 // --- دالة مساعدة لمعالجة بيانات التصنيفات ---
 Map<String, Color> _processCategoryColors(QuerySnapshot categorySnapshot) {
@@ -23,9 +23,8 @@ Map<String, Color> _processCategoryColors(QuerySnapshot categorySnapshot) {
 
 // --- ويدجت مساعد لتثبيت شريط التصنيفات ---
 class _SliverCategoryBarDelegate extends SliverPersistentHeaderDelegate {
-  final CategoryBar categoryBar;
-
-  _SliverCategoryBarDelegate(this.categoryBar);
+  final Widget child;
+  const _SliverCategoryBarDelegate(this.child);
 
   @override
   double get minExtent => 50.0;
@@ -35,17 +34,15 @@ class _SliverCategoryBarDelegate extends SliverPersistentHeaderDelegate {
   @override
   Widget build(
       BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Container(
-      color: Theme.of(context).scaffoldBackgroundColor,
-      child: categoryBar,
-    );
+    return child;
   }
 
   @override
-  bool shouldRebuild(_SliverCategoryBarDelegate oldDelegate) {
-    return false;
-  }
+  bool shouldRebuild(_SliverCategoryBarDelegate oldDelegate) => true;
 }
+
+// ── مفتاح حفظ تفضيل المستخدم ──────────────────────────────────
+const String _kLayoutPrefKey = 'meal_layout_is_list';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -55,59 +52,79 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen>
-    with AutomaticKeepAliveClientMixin {
+    with AutomaticKeepAliveClientMixin, SingleTickerProviderStateMixin {
   @override
   bool get wantKeepAlive => true;
 
   String _selectedCategory = 'الكل';
   String _searchQuery = '';
+  bool _isListView = false;
+
+  late AnimationController _fadeController;
+  late Animation<double> _fadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _fadeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+      value: 1.0,
+    );
+    _fadeAnimation = CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeIn,
+    );
+    _loadLayoutPreference();
+  }
+
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    super.dispose();
+  }
+
+  // ── تحميل تفضيل العرض من SharedPreferences ────────────────
+  Future<void> _loadLayoutPreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getBool(_kLayoutPrefKey);
+    if (saved != null && mounted) {
+      setState(() => _isListView = saved);
+    }
+  }
+
+  // ── تبديل طريقة العرض وحفظها ──────────────────────────────
+  Future<void> _toggleLayout() async {
+    // fade out → تبديل → fade in
+    await _fadeController.reverse();
+    setState(() => _isListView = !_isListView);
+    _fadeController.forward();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kLayoutPrefKey, _isListView);
+  }
 
   void _onCategorySelected(String category) {
-    setState(() {
-      _selectedCategory = category;
-    });
+    setState(() => _selectedCategory = category);
   }
 
   void _onSearchChanged(String query) {
-    setState(() {
-      _searchQuery = query;
-    });
+    setState(() => _searchQuery = query);
   }
 
-  void _addToCart(
-      String mealId, Map<String, dynamic> mealData, num finalPrice) {
+  // ── تبديل المفضلة ──────────────────────────────────────────
+  void _toggleFavorite(String mealId, bool isFavorite) {
     final userId = FirebaseAuth.instance.currentUser?.uid;
     if (userId == null) return;
-
-    final cartItemData = Map<String, dynamic>.from(mealData);
-    cartItemData.remove('discountPrice');
-    cartItemData['price'] = finalPrice;
-
-    final cartRef = FirebaseFirestore.instance
+    final favoriteRef = FirebaseFirestore.instance
         .collection('users')
         .doc(userId)
-        .collection('cart')
+        .collection('favorites')
         .doc(mealId);
-
-    FirebaseFirestore.instance.runTransaction((transaction) async {
-      final snapshot = await transaction.get(cartRef);
-      if (!snapshot.exists) {
-        transaction.set(cartRef, {
-          ...cartItemData,
-          'quantity': 1,
-          'addedAt': FieldValue.serverTimestamp()
-        });
-      } else {
-        final newQuantity = (snapshot.data()!['quantity'] ?? 0) + 1;
-        transaction.update(cartRef, {'quantity': newQuantity});
-      }
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('تمت إضافة "${mealData['name']}" إلى السلة!'),
-      backgroundColor: Colors.green,
-      duration: const Duration(seconds: 2),
-    ));
+    if (isFavorite) {
+      favoriteRef.delete();
+    } else {
+      favoriteRef.set({'addedAt': DateTime.now()});
+    }
   }
 
   @override
@@ -126,11 +143,13 @@ class _HomeScreenState extends State<HomeScreen>
             return false;
           },
           child: StreamBuilder<QuerySnapshot>(
-            stream:
-                FirebaseFirestore.instance.collection('categories').snapshots(),
+            stream: FirebaseFirestore.instance
+                .collection('categories')
+                .snapshots(),
             builder: (context, categorySnapshot) {
-              if (!categorySnapshot.hasData)
+              if (!categorySnapshot.hasData) {
                 return const Center(child: CircularProgressIndicator());
+              }
               final categoryColors =
                   _processCategoryColors(categorySnapshot.data!);
 
@@ -154,393 +173,123 @@ class _HomeScreenState extends State<HomeScreen>
                         .collection('meals')
                         .snapshots(),
                     builder: (context, mealSnapshot) {
-                      if (!mealSnapshot.hasData)
-                        return const Center(child: CircularProgressIndicator());
+                      if (!mealSnapshot.hasData) {
+                        return const Center(
+                            child: CircularProgressIndicator());
+                      }
 
                       var meals = mealSnapshot.data!.docs;
 
-                      // ---===  المنطق الجديد هنا: التحقق من وجود عروض أولاً  ===---
+                      // --- فلترة العروض ---
                       final bool hasAnyOffers = meals.any((doc) {
                         final data = doc.data() as Map<String, dynamic>;
-                        final discountPrice = data['discountPrice'] as num?;
+                        final discountPrice =
+                            data['discountPrice'] as num?;
                         return discountPrice != null && discountPrice > 0;
                       });
 
-                      // ---===  منطق الفلترة الشامل  ===---
+                      // --- فلترة التصنيف ---
                       if (_selectedCategory == 'العروض') {
                         meals = meals.where((doc) {
-                          final data = doc.data() as Map<String, dynamic>;
-                          final discountPrice = data['discountPrice'] as num?;
-                          return discountPrice != null && discountPrice > 0;
+                          final data =
+                              doc.data() as Map<String, dynamic>;
+                          final discountPrice =
+                              data['discountPrice'] as num?;
+                          return discountPrice != null &&
+                              discountPrice > 0;
                         }).toList();
                       } else if (_selectedCategory != 'الكل') {
                         meals = meals.where((doc) {
-                          final data = doc.data() as Map<String, dynamic>;
+                          final data =
+                              doc.data() as Map<String, dynamic>;
                           return data['category'] == _selectedCategory;
                         }).toList();
                       }
 
+                      // --- فلترة البحث ---
                       if (_searchQuery.isNotEmpty) {
                         meals = meals.where((doc) {
-                          final data = doc.data() as Map<String, dynamic>;
-                          final name =
-                              (data['name'] as String? ?? '').toLowerCase();
-                          return name.contains(_searchQuery.toLowerCase());
+                          final data =
+                              doc.data() as Map<String, dynamic>;
+                          final name = (data['name'] as String? ?? '')
+                              .toLowerCase();
+                          return name
+                              .contains(_searchQuery.toLowerCase());
                         }).toList();
                       }
+
+                      // ── بناء الـ CategoryBar مع زر التبديل ──
+                      final categoryBarWidget = CategoryBar(
+                        onCategorySelected: _onCategorySelected,
+                        hasOffers: hasAnyOffers,
+                        onLayoutToggle: _toggleLayout,
+                        isListView: _isListView,
+                      );
 
                       return CustomScrollView(
                         key: const PageStorageKey<String>(
                             'homeScreenScrollView'),
                         slivers: [
+                          // ── شريط البحث ────────────────────
                           SliverToBoxAdapter(
                             child: SearchBarWidget(
                                 onSearchChanged: _onSearchChanged),
                           ),
-                          SliverToBoxAdapter(
-                            child: const PromoBanner(),
+
+                          // ── البنرات ───────────────────────
+                          const SliverToBoxAdapter(
+                            child: PromoBanner(),
                           ),
+
+                          // ── شريط التصنيفات + زر التبديل ──
                           SliverPersistentHeader(
                             delegate: _SliverCategoryBarDelegate(
-                              CategoryBar(
-                                  onCategorySelected: _onCategorySelected,
-                                  hasOffers: hasAnyOffers),
-                            ),
+                                categoryBarWidget),
                             pinned: true,
                           ),
+
+                          // ── حالة فارغة ───────────────────
                           if (meals.isEmpty)
                             SliverFillRemaining(
                               child: Center(
                                 child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.center,
                                   children: [
                                     Icon(
                                       _searchQuery.isNotEmpty
                                           ? Icons.search_off
                                           : Icons.restaurant_menu,
-                                      size: 50,
-                                      color: Colors.grey,
+                                      size: 60,
+                                      color: Colors.grey[400],
                                     ),
-                                    const SizedBox(height: 10),
+                                    const SizedBox(height: 12),
                                     Text(
                                       _searchQuery.isNotEmpty
                                           ? 'لا توجد نتائج بحث!'
                                           : 'لا توجد وجبات في هذا التصنيف!',
-                                      style: const TextStyle(
-                                          fontSize: 22, color: Colors.grey),
+                                      style: TextStyle(
+                                          fontSize: 18,
+                                          color: Colors.grey[500]),
                                     ),
                                   ],
                                 ),
                               ),
                             )
+                          // ── عرض الوجبات: شبكة أو قائمة مع fade ──
+                          else if (_isListView)
+                            SliverFadeTransition(
+                              opacity: _fadeAnimation,
+                              sliver: _buildListView(
+                                  meals, categoryColors,
+                                  favoriteMealIds, userId),
+                            )
                           else
-                            SliverPadding(
-                              padding: const EdgeInsets.all(12.0),
-                              sliver: SliverGrid(
-                                gridDelegate:
-                                    const SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 2,
-                                  crossAxisSpacing: 12.0,
-                                  mainAxisSpacing: 12.0,
-                                  childAspectRatio: 0.68,
-                                ),
-                                delegate: SliverChildBuilderDelegate(
-                                  (context, index) {
-                                    final mealDoc = meals[index];
-                                    final mealData =
-                                        mealDoc.data() as Map<String, dynamic>;
-                                    final mealId = mealDoc.id;
-                                    final categoryName =
-                                        mealData['category'] ?? 'غير مصنف';
-                                    final lookupKey =
-                                        categoryName.trim().toLowerCase();
-                                    final categoryColor =
-                                        categoryColors[lookupKey] ??
-                                            Colors.grey;
-                                    final bool isFavorite =
-                                        favoriteMealIds.contains(mealId);
-                                    final originalPrice =
-                                        mealData['price'] as num?;
-                                    final discountPrice =
-                                        mealData['discountPrice'] as num?;
-                                    final bool hasDiscount =
-                                        discountPrice != null &&
-                                            originalPrice != null &&
-                                            discountPrice < originalPrice;
-
-                                    return Card(
-                                      key: ValueKey(mealId),
-                                      color:
-                                          Theme.of(context).colorScheme.surface,
-                                      elevation: 3,
-                                      shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(15)),
-                                      clipBehavior: Clip.antiAlias,
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.stretch,
-                                        children: [
-                                          Expanded(
-                                            flex: 5,
-                                            child: Stack(
-                                              fit: StackFit.expand,
-                                              children: [
-                                                GestureDetector(
-                                                  onTap: () {
-                                                    FocusScope.of(context)
-                                                        .unfocus();
-                                                    Navigator.of(context)
-                                                        .push(PageRouteBuilder(
-                                                      opaque: false,
-                                                      pageBuilder: (_, __,
-                                                              ___) =>
-                                                          ImageViewerScreen(
-                                                              imageUrl: mealData[
-                                                                      'imageUrl'] ??
-                                                                  '',
-                                                              heroTag: mealId),
-                                                    ));
-                                                  },
-                                                  child: Hero(
-                                                    tag: mealId,
-                                                    child: CachedNetworkImage(
-                                                      imageUrl: mealData[
-                                                              'imageUrl'] ??
-                                                          '',
-                                                      fit: BoxFit.cover,
-                                                      placeholder: (context,
-                                                              url) =>
-                                                          Container(
-                                                              color: Colors
-                                                                  .grey[200]),
-                                                      errorWidget: (context,
-                                                              error,
-                                                              stackTrace) =>
-                                                          const Icon(
-                                                              Icons
-                                                                  .broken_image,
-                                                              size: 40,
-                                                              color:
-                                                                  Colors.grey),
-                                                    ),
-                                                  ),
-                                                ),
-                                                if (userId != null)
-                                                  Positioned(
-                                                    top: 8,
-                                                    right: 8,
-                                                    child: CircleAvatar(
-                                                      backgroundColor: Colors
-                                                          .white
-                                                          .withOpacity(0.7),
-                                                      radius: 18,
-                                                      child: IconButton(
-                                                        padding:
-                                                            EdgeInsets.zero,
-                                                        icon: Icon(
-                                                          isFavorite
-                                                              ? Icons.favorite
-                                                              : Icons
-                                                                  .favorite_border,
-                                                          color: isFavorite
-                                                              ? Colors.redAccent
-                                                              : Colors.grey,
-                                                          size: 22,
-                                                        ),
-                                                        onPressed: () {
-                                                          final favoriteRef =
-                                                              FirebaseFirestore
-                                                                  .instance
-                                                                  .collection(
-                                                                      'users')
-                                                                  .doc(userId)
-                                                                  .collection(
-                                                                      'favorites')
-                                                                  .doc(mealId);
-                                                          if (isFavorite) {
-                                                            favoriteRef
-                                                                .delete();
-                                                          } else {
-                                                            favoriteRef.set({
-                                                              'addedAt':
-                                                                  Timestamp
-                                                                      .now()
-                                                            });
-                                                          }
-                                                        },
-                                                      ),
-                                                    ),
-                                                  ),
-                                                if (hasDiscount)
-                                                  Positioned(
-                                                    top: 10,
-                                                    left: -30,
-                                                    child: Transform.rotate(
-                                                      angle: -45 *
-                                                          (3.14159265359 / 180),
-                                                      child: Container(
-                                                        color: Colors.redAccent,
-                                                        padding:
-                                                            const EdgeInsets
-                                                                    .symmetric(
-                                                                horizontal: 40,
-                                                                vertical: 4),
-                                                        child: const Text('عرض',
-                                                            style: TextStyle(
-                                                                color: Colors
-                                                                    .white,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .bold,
-                                                                fontSize: 12)),
-                                                      ),
-                                                    ),
-                                                  ),
-                                              ],
-                                            ),
-                                          ),
-                                          Expanded(
-                                            flex: 4,
-                                            child: Padding(
-                                              padding:
-                                                  const EdgeInsets.all(10.0),
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                mainAxisAlignment:
-                                                    MainAxisAlignment
-                                                        .spaceBetween,
-                                                children: [
-                                                  Column(
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment
-                                                            .start,
-                                                    children: [
-                                                      Text(
-                                                        mealData['name'] ??
-                                                            'اسم الوجبة',
-                                                        style: const TextStyle(
-                                                            fontSize: 16,
-                                                            fontWeight:
-                                                                FontWeight
-                                                                    .bold),
-                                                        maxLines: 2,
-                                                        overflow: TextOverflow
-                                                            .ellipsis,
-                                                      ),
-                                                      const SizedBox(height: 4),
-                                                      Container(
-                                                        padding:
-                                                            const EdgeInsets
-                                                                    .symmetric(
-                                                                horizontal: 8,
-                                                                vertical: 3),
-                                                        decoration:
-                                                            BoxDecoration(
-                                                          color: categoryColor
-                                                              .withOpacity(0.2),
-                                                          borderRadius:
-                                                              BorderRadius
-                                                                  .circular(5),
-                                                        ),
-                                                        child: Text(
-                                                          categoryName,
-                                                          style: TextStyle(
-                                                              color:
-                                                                  categoryColor,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .bold,
-                                                              fontSize: 11),
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  Row(
-                                                    mainAxisAlignment:
-                                                        MainAxisAlignment
-                                                            .spaceBetween,
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment
-                                                            .center,
-                                                    children: [
-                                                      Column(
-                                                        crossAxisAlignment:
-                                                            CrossAxisAlignment
-                                                                .start,
-                                                        children: [
-                                                          if (hasDiscount)
-                                                            Text(
-                                                              '${originalPrice ?? 0} ريال',
-                                                              style: TextStyle(
-                                                                  fontSize: 12,
-                                                                  color: Colors
-                                                                          .grey[
-                                                                      500],
-                                                                  decoration:
-                                                                      TextDecoration
-                                                                          .lineThrough),
-                                                            ),
-                                                          Text(
-                                                            '${hasDiscount ? discountPrice : originalPrice ?? 0} ريال',
-                                                            style: TextStyle(
-                                                                fontSize: 16,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .bold,
-                                                                color: hasDiscount
-                                                                    ? Colors
-                                                                        .redAccent
-                                                                    : Theme.of(
-                                                                            context)
-                                                                        .colorScheme
-                                                                        .primary),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                      CircleAvatar(
-                                                        radius: 18,
-                                                        backgroundColor:
-                                                            Theme.of(context)
-                                                                .colorScheme
-                                                                .primary,
-                                                        child: IconButton(
-                                                          icon: const Icon(
-                                                              Icons
-                                                                  .add_shopping_cart,
-                                                              color:
-                                                                  Colors.white),
-                                                          onPressed: () {
-                                                            final finalPrice =
-                                                                hasDiscount
-                                                                    ? discountPrice
-                                                                    : originalPrice;
-                                                            if (finalPrice !=
-                                                                null) {
-                                                              addToCart(
-                                                                  context,
-                                                                  mealId,
-                                                                  mealData,
-                                                                  finalPrice);
-                                                            }
-                                                          },
-                                                          iconSize: 18,
-                                                        ),
-                                                      )
-                                                    ],
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  },
-                                  childCount: meals.length,
-                                ),
-                              ),
+                            SliverFadeTransition(
+                              opacity: _fadeAnimation,
+                              sliver: _buildGridView(
+                                  meals, categoryColors,
+                                  favoriteMealIds, userId),
                             ),
                         ],
                       );
@@ -550,6 +299,91 @@ class _HomeScreenState extends State<HomeScreen>
               );
             },
           ),
+        ),
+      ),
+    );
+  }
+
+  // ── عرض شبكي (2 عمود) ─────────────────────────────────────
+  Widget _buildGridView(
+    List<QueryDocumentSnapshot> meals,
+    Map<String, Color> categoryColors,
+    Set<String> favoriteMealIds,
+    String? userId,
+  ) {
+    return SliverPadding(
+      key: const ValueKey('grid'),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+      sliver: SliverGrid(
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 12.0,
+          mainAxisSpacing: 12.0,
+          childAspectRatio: 0.72,
+        ),
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            final mealDoc = meals[index];
+            final mealData = mealDoc.data() as Map<String, dynamic>;
+            final mealId = mealDoc.id;
+            final categoryName = mealData['category'] ?? 'غير مصنف';
+            final lookupKey = categoryName.trim().toLowerCase();
+            final categoryColor =
+                categoryColors[lookupKey] ?? Colors.grey;
+            final bool isFavorite = favoriteMealIds.contains(mealId);
+
+            return MealCardGrid(
+              key: ValueKey(mealId),
+              mealId: mealId,
+              mealData: mealData,
+              isFavorite: isFavorite,
+              categoryColor: categoryColor,
+              userId: userId,
+              onFavoriteToggle: _toggleFavorite,
+            );
+          },
+          childCount: meals.length,
+        ),
+      ),
+    );
+  }
+
+  // ── عرض قائمة ─────────────────────────────────────────────
+  Widget _buildListView(
+    List<QueryDocumentSnapshot> meals,
+    Map<String, Color> categoryColors,
+    Set<String> favoriteMealIds,
+    String? userId,
+  ) {
+    return SliverPadding(
+      key: const ValueKey('list'),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            final mealDoc = meals[index];
+            final mealData = mealDoc.data() as Map<String, dynamic>;
+            final mealId = mealDoc.id;
+            final categoryName = mealData['category'] ?? 'غير مصنف';
+            final lookupKey = categoryName.trim().toLowerCase();
+            final categoryColor =
+                categoryColors[lookupKey] ?? Colors.grey;
+            final bool isFavorite = favoriteMealIds.contains(mealId);
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: MealCardList(
+                key: ValueKey(mealId),
+                mealId: mealId,
+                mealData: mealData,
+                isFavorite: isFavorite,
+                categoryColor: categoryColor,
+                userId: userId,
+                onFavoriteToggle: _toggleFavorite,
+              ),
+            );
+          },
+          childCount: meals.length,
         ),
       ),
     );

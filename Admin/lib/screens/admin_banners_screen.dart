@@ -1,10 +1,9 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:remixicon/remixicon.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:http/http.dart' as http;
 import 'package:cached_network_image/cached_network_image.dart';
+import '../services/imagekit_service.dart';
 
 class AdminBannersScreen extends StatefulWidget {
   const AdminBannersScreen({Key? key}) : super(key: key);
@@ -28,7 +27,7 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
       _isUploading = true;
     });
 
-    final uploadResult = await _uploadImage(image);
+    final uploadResult = await ImageKitService.uploadImage(image);
 
     if (uploadResult != null) {
       final querySnapshot =
@@ -60,58 +59,14 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
     }
   }
 
-  Future<Map<String, String>?> _uploadImage(XFile image) async {
-    // !!! هام: استبدل القيم هنا بالقيم الخاصة بك من ImageKit.io !!!
-    const String publicKey = "public_IQs0W4JRSIO0lizon9bRQPTTpPM=";
-    const String privateKey = "private_8QG/DSp930xIjGpZ6qmkYK1iz/E=";
-    final url = Uri.parse('https://upload.imagekit.io/api/v1/files/upload');
-    final request = http.MultipartRequest('POST', url);
-
-    final String basicAuth =
-        'Basic ' + base64Encode(utf8.encode('$privateKey:'));
-    request.headers['Authorization'] = basicAuth;
-
-    final bytes = await image.readAsBytes();
-    final multipartFile =
-        http.MultipartFile.fromBytes('file', bytes, filename: image.name);
-    request.files.add(multipartFile);
-
-    request.fields['publicKey'] = publicKey;
-    request.fields['fileName'] = image.name;
-
-    try {
-      final response = await request.send();
-      if (response.statusCode == 200) {
-        final responseData = await response.stream.bytesToString();
-        final jsonResponse = json.decode(responseData);
-        return {'url': jsonResponse['url'], 'fileId': jsonResponse['fileId']};
-      }
-    } catch (e) {
-      print('Error uploading banner: $e');
-    }
-    return null;
-  }
 
   Future<void> _deleteBanner(DocumentSnapshot bannerDoc) async {
     final data = bannerDoc.data() as Map<String, dynamic>;
     final fileId = data['imageFileId'] as String?;
 
     await bannerDoc.reference.delete();
-
     if (fileId != null) {
-      await _deleteImageFromImageKit(fileId);
-    }
-  }
-
-  Future<void> _deleteImageFromImageKit(String fileId) async {
-    const String privateKey = "private_8QG/DSp930xIjGpZ6qmkYK1iz/E=";
-    final url = Uri.parse('https://api.imagekit.io/v1/files/$fileId');
-    final String basicAuth =
-        'Basic ' + base64Encode(utf8.encode('$privateKey:'));
-    try {
-      await http.delete(url, headers: {'Authorization': basicAuth});
-    } catch (e) {
-      print('Error deleting banner image: $e');
+      await ImageKitService.deleteImage(fileId);
     }
   }
 

@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
+import 'core/app_config.dart';
 import 'providers/theme_provider.dart';
 import 'screens/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
-    // !!! هام: الصق مفاتيح الربط الخاصة بك هنا !!!
+    // مفاتيح Firebase الخاصة بهذا المشروع
     options: const FirebaseOptions(
         apiKey: "AIzaSyDn7j9WaR66wDXTmy1SsjwxY4_AUssf7eA",
         authDomain: "tajalqaisar-605bf.firebaseapp.com",
@@ -44,7 +45,7 @@ class MyApp extends StatelessWidget {
             Locale('ar', 'YE'),
           ],
           locale: const Locale('ar', 'YE'),
-          title: 'مطعم تاج القيصر',
+          title: AppConfig.restaurantFullName,
           debugShowCheckedModeBanner: false,
 
           // ---===  تطبيق الثيمات هنا  ===---
@@ -55,16 +56,16 @@ class MyApp extends StatelessWidget {
             brightness: Brightness.light,
             scaffoldBackgroundColor: const Color(0xfffbfbfb),
             colorScheme: ColorScheme.fromSeed(
-              seedColor: const Color(0xFF6a2e0e),
-              primary: const Color(0xFF6a2e0e),
-              secondary: const Color(0xFFf39c12),
+              seedColor: AppConfig.primaryColor,
+              primary: AppConfig.primaryColor,
+              secondary: AppConfig.secondaryColor,
               surface: Colors.white,
               brightness: Brightness.light,
             ),
             elevatedButtonTheme: ElevatedButtonThemeData(
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF6a2e0e), // اللون الرئيسي للزر
-                foregroundColor: Colors.white, // لون النص
+                backgroundColor: AppConfig.primaryColor,
+                foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12), // حواف دائرية للزر
                 ),
@@ -75,11 +76,11 @@ class MyApp extends StatelessWidget {
             ),
             textButtonTheme: TextButtonThemeData(
               style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFF6a2e0e), // اللون الرئيسي للنص
+                foregroundColor: AppConfig.primaryColor,
               ),
             ),
             floatingActionButtonTheme: FloatingActionButtonThemeData(
-              backgroundColor: const Color(0xFF6a2e0e),
+              backgroundColor: AppConfig.primaryColor,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -104,10 +105,10 @@ class MyApp extends StatelessWidget {
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide:
-                    BorderSide(color: const Color(0xFF6a2e0e), width: 2),
+                    BorderSide(color: AppConfig.primaryColor, width: 2),
                 gapPadding: 4,
               ),
-              prefixIconColor: const Color(0xFF6a2e0e).withOpacity(0.7),
+              prefixIconColor: AppConfig.primaryColor.withOpacity(0.7),
             ),
             // باقي إعدادات الثيم الفاتح
           ),
@@ -117,17 +118,16 @@ class MyApp extends StatelessWidget {
             brightness: Brightness.dark,
             scaffoldBackgroundColor: const Color(0xFF121212),
             colorScheme: ColorScheme.fromSeed(
-              seedColor: const Color(0xFF6a2e0e),
-              primary: const Color(0xff9c5d32), // نسخة أفتح من البني
-              secondary: const Color(0xFFFFB74D), // نسخة أفتح من الذهبي
-              surface: const Color(0xFF1E1E1E), // لون البطاقات الداكن
+              seedColor: AppConfig.primaryColorDark,
+              primary: AppConfig.primaryColorDark,
+              secondary: AppConfig.secondaryColorDark,
+              surface: const Color(0xFF1E1E1E),
               brightness: Brightness.dark,
             ),
             elevatedButtonTheme: ElevatedButtonThemeData(
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(
-                    0xFF9c5d32), // اللون الرئيسي للزر في الثيم الداكن
-                foregroundColor: Colors.white, // لون النص
+                backgroundColor: AppConfig.primaryColorDark,
+                foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12), // حواف دائرية للزر
                 ),
@@ -138,12 +138,11 @@ class MyApp extends StatelessWidget {
             ),
             textButtonTheme: TextButtonThemeData(
               style: TextButton.styleFrom(
-                foregroundColor: const Color(
-                    0xFF9c5d32), // اللون الرئيسي للنص في الثيم الداكن
+                foregroundColor: AppConfig.primaryColorDark,
               ),
             ),
             floatingActionButtonTheme: FloatingActionButtonThemeData(
-              backgroundColor: const Color(0xFF9c5d32),
+              backgroundColor: AppConfig.primaryColorDark,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -168,10 +167,10 @@ class MyApp extends StatelessWidget {
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide:
-                    BorderSide(color: const Color(0xFFFFB74D), width: 2),
+                    BorderSide(color: AppConfig.secondaryColorDark, width: 2),
                 gapPadding: 4,
               ),
-              prefixIconColor: const Color(0xFFFFB74D).withOpacity(0.7),
+              prefixIconColor: AppConfig.secondaryColorDark.withOpacity(0.7),
             ),
             // باقي إعدادات الثيم الداكن
           ),

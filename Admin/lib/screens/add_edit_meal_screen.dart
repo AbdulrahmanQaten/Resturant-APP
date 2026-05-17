@@ -1,9 +1,9 @@
-import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:remixicon/remixicon.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:http/http.dart' as http;
+import '../services/imagekit_service.dart';
 
 class AddEditMealScreen extends StatefulWidget {
   final DocumentSnapshot? mealDoc;
@@ -55,69 +55,6 @@ class _AddEditMealScreenState extends State<AddEditMealScreen> {
     }
   }
 
-  Future<void> _deleteImage(String fileId) async {
-    // !!! هام: لقد قمت بحذف المفاتيح من هنا. يرجى استبدالها بمفاتيحك الجديدة. !!!
-    const String privateKey = "private_lgVfvTjwE4gXiOfWPib07U6ZIOE=";
-    final url = Uri.parse('https://api.imagekit.io/v1/files/$fileId');
-
-    final String basicAuth =
-        'Basic ' + base64Encode(utf8.encode('$privateKey:'));
-
-    try {
-      print('Attempting to delete image with fileId: $fileId');
-      final response =
-          await http.delete(url, headers: {'Authorization': basicAuth});
-      if (response.statusCode == 204) {
-        print('Successfully deleted old image from ImageKit.');
-      } else {
-        print(
-            'Failed to delete old image. Status: ${response.statusCode}, Body: ${response.body}');
-      }
-    } catch (e) {
-      print('Error deleting image: $e');
-    }
-  }
-
-  Future<Map<String, String>?> _uploadImage(XFile image) async {
-    // !!! هام: استبدل القيم هنا بالقيم الخاصة بك من ImageKit.io !!!
-    const String publicKey = "public_IQs0W4JRSIO0lizon9bRQPTTpPM=";
-    const String privateKey = "private_8QG/DSp930xIjGpZ6qmkYK1iz/E=";
-    final url = Uri.parse('https://upload.imagekit.io/api/v1/files/upload');
-    final request = http.MultipartRequest('POST', url);
-
-    final String basicAuth =
-        'Basic ' + base64Encode(utf8.encode('$privateKey:'));
-    request.headers['Authorization'] = basicAuth;
-
-    final bytes = await image.readAsBytes();
-    final multipartFile =
-        http.MultipartFile.fromBytes('file', bytes, filename: image.name);
-    request.files.add(multipartFile);
-
-    request.fields['publicKey'] = publicKey;
-    request.fields['fileName'] = image.name;
-
-    try {
-      final response = await request.send();
-      if (response.statusCode == 200) {
-        final responseData = await response.stream.bytesToString();
-        final jsonResponse = json.decode(responseData);
-        print(
-            'Image uploaded successfully. URL: ${jsonResponse['url']}, FileID: ${jsonResponse['fileId']}');
-        return {
-          'url': jsonResponse['url'],
-          'fileId': jsonResponse['fileId'],
-        };
-      } else {
-        print(
-            'ImageKit Upload Error: ${await response.stream.bytesToString()}');
-        return null;
-      }
-    } catch (e) {
-      print('Error uploading image: $e');
-      return null;
-    }
-  }
 
   Future<void> _saveMeal() async {
     if (!_formKey.currentState!.validate()) return;
@@ -141,10 +78,10 @@ class _AddEditMealScreenState extends State<AddEditMealScreen> {
 
     if (_imageFile != null) {
       if (_isEditing && _imageFileId != null) {
-        await _deleteImage(_imageFileId!);
+        await ImageKitService.deleteImage(_imageFileId!);
       }
 
-      final uploadResult = await _uploadImage(_imageFile!);
+      final uploadResult = await ImageKitService.uploadImage(_imageFile!);
       if (uploadResult == null) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text('فشل رفع الصورة، يرجى المحاولة مرة أخرى.'),
